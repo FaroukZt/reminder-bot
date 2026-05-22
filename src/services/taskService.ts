@@ -1,84 +1,82 @@
-import { Task } from '../types';
-import { v4 as uuidv4 } from 'uuid';
-
-const STORAGE_KEY = 'reminder_tasks';
+import { Task } from '../models/Task.js';
+import { ITask, TaskInput, Pattern } from '../types/index.js';
+import { calculateNextTriggerTime } from '../utils/timeUtils.js';
 
 export class TaskService {
-  static getAllTasks(): Task[] {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-    
-    try {
-      return JSON.parse(stored).map((task: any) => ({
-        ...task,
-        createdAt: new Date(task.createdAt),
-        nextTrigger: new Date(task.nextTrigger),
-        lastTriggered: task.lastTriggered ? new Date(task.lastTriggered) : undefined,
-      }));
-    } catch (error) {
-      console.error('Error parsing tasks:', error);
-      return [];
-    }
+  static async createTask(userId: string, input: TaskInput): Promise<ITask> {
+    const nextTrigger = calculateNextTriggerTime(
+      input.duration,
+      input.durationUnit,
+      input.pattern
+    );
+
+    const task = new Task({
+      userId,
+      name: input.name,
+      duration: input.duration,
+      durationUnit: input.durationUnit,
+      pattern: input.pattern,
+      nextTrigger,
+      isActive: true,
+      notificationSent: false,
+    });
+
+    return await task.save();
   }
 
-  static saveTask(task: Omit<Task, 'id'>): Task {
-    const newTask: Task = {
-      ...task,
-      id: uuidv4(),
-    };
-
-    const tasks = this.getAllTasks();
-    tasks.push(newTask);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    return newTask;
+  static async getUserTasks(userId: string): Promise<ITask[]> {
+    return await Task.find({ userId }).sort({ nextTrigger: 1 });
   }
 
-  static updateTask(id: string, updates: Partial<Task>): Task | null {
-    const tasks = this.getAllTasks();
-    const index = tasks.findIndex(t => t.id === id);
-    
-    if (index === -1) return null;
-    
-    tasks[index] = { ...tasks[index], ...updates };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    return tasks[index];
+  static async getActiveTasks(): Promise<ITask[]> {
+    return await Task.find({
+      isActive: true,
+      notificationSent: false,
+    }).sort({ nextTrigger: 1 });
   }
 
-  static deleteTask(id: string): boolean {
-    const tasks = this.getAllTasks();
-    const filtered = tasks.filter(t => t.id !== id);
-    
-    if (filtered.length === tasks.length) return false;
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-    return true;
+  static async getTaskById(taskId: string): Promise<ITask | null> {
+    return await Task.findById(taskId);
   }
 
-  static toggleTaskStatus(id: string): Task | null {
-    const tasks = this.getAllTasks();
-    const task = tasks.find(t => t.id === id);
-    
+  static async updateTask(
+    taskId: string,
+    updates: Partial<ITask>
+  ): Promise<ITask | null> {
+    return await Task.findByIdAndUpdate(taskId, updates, { new: true });
+  }
+
+  static async deleteTask(taskId: string): Promise<boolean> {
+    const result = await Task.findByIdAndDelete(taskId);
+    return !!result;
+  }
+
+  static async toggleTaskStatus(taskId: string): Promise<ITask | null> {
+    const task = await Task.findById(taskId);
     if (!task) return null;
-    
+
     task.isActive = !task.isActive;
-    const index = tasks.findIndex(t => t.id === id);
-    tasks[index] = task;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    return task;
+    return await task.save();
   }
 
-  static calculateNextTriggerTime(duration: number, unit: string, pattern: string): Date {
-    const now = new Date();
-    const next = new Date(now);
+  static async markAsNotified(taskId: string, pattern: Pattern): Promise<void> {
+    const task = await Task.findById(taskId);
+    if (!task) return;
 
-    if (unit === 'دقيقة') {
-      next.setMinutes(next.getMinutes() + duration);
-    } else if (unit === 'ساعة') {
-      next.setHours(next.getHours() + duration);
-    } else if (unit === 'يوم') {
-      next.setDate(next.getDate() + duration);
+    task.lastTriggered = new Date();
+    task.notificationSent = true;
+
+    if (pattern === Pattern.ONCE) {
+      task.isActive = false;
+    } else {
+      task.nextTrigger = calculateNextTriggerTime(
+        task.duration,
+        task.durationUnit,
+        task.pattern
+      );
+      task.notificationSent = false;
     }
 
-    return next;
+    await task.save();
   }
 }

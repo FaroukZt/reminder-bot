@@ -1,64 +1,76 @@
+import {
+  Client,
+  User,
+  EmbedBuilder,
+  ChannelType,
+} from 'discord.js';
+import { TaskService } from './taskService.js';
+import { formatTimeRemaining, formatDateTime } from '../utils/timeUtils.js';
+import { logger } from '../utils/logger.js';
+
 export class NotificationService {
-  static requestPermission(): Promise<boolean> {
-    return new Promise((resolve) => {
-      if (!('Notification' in window)) {
-        console.log('This browser does not support notifications');
-        resolve(false);
-        return;
-      }
+  private static client: Client;
 
-      if (Notification.permission === 'granted') {
-        resolve(true);
-        return;
-      }
-
-      if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then((permission) => {
-          resolve(permission === 'granted');
-        });
-      } else {
-        resolve(false);
-      }
-    });
+  static initialize(client: Client) {
+    this.client = client;
   }
 
-  static sendNotification(title: string, options?: NotificationOptions): Notification | null {
-    if (Notification.permission !== 'granted') {
-      return null;
+  static async sendNotification(
+    userId: string,
+    taskName: string,
+    nextTrigger: Date
+  ) {
+    try {
+      const user = await this.client.users.fetch(userId);
+      if (!user) {
+        logger.error(`User ${userId} not found`);
+        return;
+      }
+
+      const dmChannel = await user.createDM();
+      const embed = new EmbedBuilder()
+        .setColor('#ff6b35')
+        .setTitle('⏰ تنبيه المهمة')
+        .setDescription(`حان الوقت للقيام بـ: **${taskName}**`)
+        .addFields(
+          {
+            name: '📋 المهمة',
+            value: taskName,
+            inline: true,
+          },
+          {
+            name: '⏱️ الوقت الحالي',
+            value: formatDateTime(new Date()),
+            inline: true,
+          },
+          {
+            name: '📅 التنبيه التالي',
+            value: formatDateTime(nextTrigger),
+            inline: false,
+          }
+        )
+        .setTimestamp();
+
+      await dmChannel.send({ embeds: [embed] });
+      logger.info(`Notification sent to ${userId} for task: ${taskName}`);
+    } catch (error) {
+      logger.error(`Error sending notification to ${userId}:`, error);
     }
-
-    const notification = new Notification(title, {
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ff6b35"/><text x="50" y="60" font-size="60" text-anchor="middle" fill="white" font-weight="bold">⏰</text></svg>',
-      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ff6b35"/></svg>',
-      ...options,
-    });
-
-    // Play sound
-    this.playSound();
-
-    // Auto close after 5 seconds
-    setTimeout(() => {
-      notification.close();
-    }, 5000);
-
-    return notification;
   }
 
-  static playSound(): void {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+  static async checkAndSendNotifications() {
+    try {
+      const activeTasks = await TaskService.getActiveTasks();
+      const now = new Date();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
+      for (const task of activeTasks) {
+        if (now >= task.nextTrigger && !task.notificationSent) {
+          await this.sendNotification(task.userId, task.name, task.nextTrigger);
+          await TaskService.markAsNotified(task._id.toString(), task.pattern);
+        }
+      }
+    } catch (error) {
+      logger.error('Error checking notifications:', error);
+    }
   }
 }

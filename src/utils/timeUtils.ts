@@ -1,24 +1,52 @@
-export function formatTime(date: Date): string {
-  return date.toLocaleTimeString('ar-EG', {
+import { ITask, DurationUnit, Pattern } from '../types/index.js';
+
+export function calculateNextTriggerTime(
+  duration: number,
+  unit: string,
+  pattern: string
+): Date {
+  const now = new Date();
+  const next = new Date(now);
+
+  switch (unit) {
+    case DurationUnit.MINUTE:
+      next.setMinutes(next.getMinutes() + duration);
+      break;
+    case DurationUnit.HOUR:
+      next.setHours(next.getHours() + duration);
+      break;
+    case DurationUnit.DAY:
+      next.setDate(next.getDate() + duration);
+      break;
+  }
+
+  if (pattern === Pattern.DAILY) {
+    // اليوم القادم بنفس الوقت
+    const nextDaily = new Date(next);
+    nextDaily.setDate(nextDaily.getDate() + 1);
+    return nextDaily;
+  } else if (pattern === Pattern.WEEKLY) {
+    // الأسبوع القادم بنفس اليوم والوقت
+    const nextWeekly = new Date(next);
+    nextWeekly.setDate(nextWeekly.getDate() + 7);
+    return nextWeekly;
+  }
+
+  return next;
+}
+
+export function formatDateTime(date: Date): string {
+  return date.toLocaleString('ar-EG', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   });
 }
 
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString('ar-EG', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-export function formatDateTime(date: Date): string {
-  return `${formatDate(date)} - ${formatTime(date)}`;
-}
-
-export function getTimeUntil(targetDate: Date): string {
+export function formatTimeRemaining(targetDate: Date): string {
   const now = new Date();
   const diff = targetDate.getTime() - now.getTime();
 
@@ -35,15 +63,14 @@ export function getTimeUntil(targetDate: Date): string {
   return `${seconds} ثانية`;
 }
 
-export function convertToMinutes(duration: number, unit: string): number {
-  switch (unit) {
-    case 'دقيقة':
-      return duration;
-    case 'ساعة':
-      return duration * 60;
-    case 'يوم':
-      return duration * 24 * 60;
-    default:
-      return duration;
-  }
+export function getTaskSummary(task: ITask): string {
+  const timeRemaining = formatTimeRemaining(task.nextTrigger);
+  const status = task.isActive ? '✅ نشطة' : '⛔ موقوفة';
+
+  return (
+    `**${task.name}**\n` +
+    `${status} | ${task.pattern}\n` +
+    `المدة: ${task.duration} ${task.durationUnit}\n` +
+    `الوقت المتبقي: ${timeRemaining}`
+  );
 }

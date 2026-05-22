@@ -1,27 +1,33 @@
-export interface Task {
-  id: string;
-  name: string;
-  duration: number; // في الدقائق
-  durationUnit: 'دقيقة' | 'ساعة' | 'يوم';
-  pattern: 'يومي' | 'أسبوعي' | 'مخصص';
-  isActive: boolean;
-  createdAt: Date;
-  lastTriggered?: Date;
-  nextTrigger: Date;
-  notificationSent: boolean;
-  color?: string;
-}
+import { Document } from 'mongoose';
 
-export interface NotificationData {
-  taskId: string;
-  taskName: string;
-  time: Date;
-}
-
-export interface UserSettings {
+export interface ITask extends Document {
   userId: string;
-  theme: 'dark' | 'light';
-  soundEnabled: boolean;
-  notificationEnabled: boolean;
-  defaultPattern: 'يومي' | 'أسبوعي' | 'مخصص';
+  name: string;
+  duration: number;
+  durationUnit: 'دقيقة' | 'ساعة' | 'يوم';
+  pattern: 'مرة_واحدة' | 'يومي' | 'أسبوعي';
+  createdAt: Date;
+  nextTrigger: Date;
+  isActive: boolean;
+  lastTriggered?: Date;
+  notificationSent: boolean;
+}
+
+export interface TaskInput {
+  name: string;
+  duration: number;
+  durationUnit: 'دقيقة' | 'ساعة' | 'يوم';
+  pattern: 'مرة_واحدة' | 'يومي' | 'أسبوعي';
+}
+
+export enum DurationUnit {
+  MINUTE = 'دقيقة',
+  HOUR = 'ساعة',
+  DAY = 'يوم',
+}
+
+export enum Pattern {
+  ONCE = 'مرة_واحدة',
+  DAILY = 'يومي',
+  WEEKLY = 'أسبوعي',
 }
