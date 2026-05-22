@@ -1,0 +1,50 @@
+:root {
+  --primary-color: #ff6b35;
+  --secondary-color: #004e89;
+  --success-color: #1abc9c;
+  --danger-color: #e74c3c;
+  --warning-color: #f39c12;
+  --dark-bg: #1a1a1a;
+  --light-bg: #f5f5f5;
+  --text-dark: #333333;
+  --text-light: #ffffff;
+  --border-color: #dddddd;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, var(--dark-bg) 0%, #2a2a2a 100%);
+  color: var(--text-dark);
+  line-height: 1.6;
+  direction: rtl;
+}
+
+html {
+  font-size: 16px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-color);
+}
